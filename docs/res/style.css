@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
+body {
+    background-color: antiquewhite;
+    margin-left: 20%;
+    margin-right: 20%;
+    font-size: 1.3em;
+}
+
+pre {
+    font-size: 0.8em !important;
+}
+
+@media (pointer:none), (pointer:coarse) {
+    body {
+        margin-left: 5%;
+        margin-right: 5%;
+        font-size: 1.9em;
+    }
+
+    pre {
+        font-size: 0.9em !important;
+    }
+}
+
+h1, h2, h3, h4, h5, h6, p, a {
+    font-family: 'PT Serif', sans-serif;
+    color: #262626;
+}
+
+/* p {
+    font-size: 10px;
+} */
+
+.gray {
+    color: #877b6f;
+}
+
+.nodec {
+    text-decoration: none;
+}
+
+.marginup {
+    margin-top: 50px;
+}
+
+
