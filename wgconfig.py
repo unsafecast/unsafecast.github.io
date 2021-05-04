@@ -1,10 +1,10 @@
 from walnutgen.function import Function
 from pathlib import Path
 import os
+import markdown
 
 POSTS = [
-    "posts/goodbye.html",
-    "posts/hello-world.html",
+    "posts/go-didnt-nail-simplicity.html",
 ]
 
 class FnPostList(Function):
@@ -22,6 +22,15 @@ class FnGetTitle(Function):
             return open(filename[:-5], mode="r").read().split(" - ")[0]
         except:
             return "NO TITLE FOR " + filename
+
+class FnFromMarkdown(Function):
+    def invoke(self, filename):
+        try:
+            with open(filename[:-5] + ".md", mode="r") as f:
+                content = f.read()
+                return markdown.markdown(content, extensions=["fenced_code"])
+        except:
+            return "POST"
 
 config = {
     "headers": [
@@ -41,5 +50,6 @@ config = {
     "functions": {
         "post_list": FnPostList(),
         "get_post_title": FnGetTitle(),
+        "from_markdown": FnFromMarkdown(),
     }
 }

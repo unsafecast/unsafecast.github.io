@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="stylesheet" href="/res/style.css" />
+
+        <link href="/res/prism.css" rel="stylesheet" />
+        <title>unsafecast - Go didn't nail simplicity</title>
+    </head>
+
+    <body>
+        <script src="/res/prism.js"></script>
+        <div>
+            <a href="/" class="nodec">
+                <h2>unsafecast's blog</h2>
+            </a>
+        </div>
+<h1>Go didn't nail simplicity</h1>
+<p>Golang is designed as a simple language that anyone can understand; and it is to some extent. But here are the reasons why, in my opinion, it didn't nail simplicity.</p>
+<p>Note that this isn't saying <em>Golang is bad</em>. Because it's not. Like every other language, it has flaws, and I'm just trying to address some of them.</p>
+<h2>1. Package Management</h2>
+<p>At the beginning of Go, there was <code>GOPATH</code>. <code>GOPATH</code> is an environment variable signifying the package path, i.e. where should Go look for packages. For example, in this code:</p>
+<pre><code class="language-go">import &quot;something/somepackage&quot;
+
+func main() {
+    somepackage.DoSomething()
+}
+</code></pre>
+<p>Go would look inside every <code>GOPATH</code> entry, and check for <code>src/something</code>. If it exists, it would bring that in.</p>
+<p>I'm not seeing anything "simple" about this. To me, this is just a constraint, <em>you need to place all your code in a certain place</em>. I guess they saw the problem with it, because they later added modules.</p>
+<p>Go modules ditched <code>GOPATH</code> and instead opted for something else: each project has a file called <code>go.mod</code>, which contains your dependencies and your module's name. This is a <strong>big</strong> improvement.</p>
+<p>But that's not what bothers me. The reason I don't like Go's package management is because of the way you pull in dependencies from the internet. If you have a project, let's call it <code>foo</code>, the module's import paths need to <em>match the URL</em>. So if you'd publish your module on <code>https://github.com/bar/foo</code>, your package name has to be <code>github.com/bar/foo</code>, otherwise you can't pull it in from other projects.</p>
+<p><strong>So, what's a better solution?</strong></p>
+<p>A better solution would be to just not care about where the project is hosted. Just import it with whatever name you want. So, in the <code>go.mod</code>, you could have something like this:</p>
+<pre><code class="language-gomod">somethingelseentirely = https://github.com/bar/foo.git
+</code></pre>
+<p>So what Go would do is download the repository at that URL and bind it to <code>somethingelseentirely</code>. So instead of importing like this</p>
+<pre><code class="language-go">import &quot;github.com/bar/foo/package&quot;
+</code></pre>
+<p>You'd import like this</p>
+<pre><code class="language-go">import &quot;somethingelseentirely/package&quot;
+</code></pre>
+<p>This is both easier to understand, and easier to write code with (not everybody uses an IDE which would autocomplete weird GitHub usernames).</p>
+<h2>2. Interfaces (and <code>interface{}</code>)</h2>
+<p>Interfaces in Go are a nice way of expressing a set of functions that a structure should implement. Here's an example:</p>
+<pre><code class="language-go">type CommunicationDevice interface {
+    SendMessage(msg Message)
+}
+
+type Fax struct {
+}
+
+func (fax *Fax) SendMessage(msg Message) {
+    // Send the message
+}
+</code></pre>
+<p>With the example above, you can pass a <code>*Fax</code> to a function of type <code>func Something(device CommunicationDevice)</code>. This is very straightforward, and it's a really useful feature of Go.</p>
+<p>But they're also kind of abused.</p>
+<p>Go is a strongly typed language that lacks unions, inheritance and sum types. This is a <em>massive</em> flaw in my opinion.</p>
+<p>So let's say you were to write an AST node type. In Rust, you can use enums (aka sum types):</p>
+<pre><code class="language-rust">enum AstNode {
+    VariableAccess(String),
+    IntLiteral(i64),
+}
+</code></pre>
+<p>In C, you would use unions (or a hacky inheritance implementation):</p>
+<pre><code class="language-c">enum AstNodeKind {
+    AST_NODE_KIND_VAR_ACCESS,
+    AST_NODE_KIND_INT_LITERAL,
+};
+
+struct AstNode {
+    enum AstNodeKind kind;
+
+    union {
+        String valVariableAccess;
+        i64 valIntLiteral;
+    };
+};
+</code></pre>
+<p>And in C++ you'd use either unions or inheritance, but I'm not going to show it here, since it's pretty straightforward.</p>
+<p>So then, how would you implement that in Go? The first thing that comes to mind is using an interface, like so:</p>
+<pre><code class="language-go">type AstNode interface {
+    NodeKind() AstNodeKind
+}
+</code></pre>
+<p>Where <code>AstNodeKind</code> is an enum (actually this is another thing with Go, they don't exist, so you'd use (type-unsafe) constants). However, most people don't do this. Let's look at the official implementation of the <code>Token</code> in <code>go/xml</code>:</p>
+<pre><code class="language-go">type Token interface{}
+</code></pre>
+<p>If you're not aware, <code>interface{}</code> is basically like a <code>void*</code> in C: it can hold <strong>anything</strong>. Zero type checking. You can pass <strong>anything</strong> to a function receiving a token. The way you differentiate between the types is using Go's reflection, you can basically switch over the underlying type of an interface. It's so easy to pass something different to a function and it's very hard to debug. The worst thing though is that this is a very widespread idea in the Go community.</p>
+<p>Another place where this is used is generics, which Go doesn't have. Thankfully though, generics in Go are in the works.</p>
+<h2>3. Capitalization</h2>
+<p>The way Go differentiates between public and private functions or types is using... capitalization? That's right, if the name begins with a capital letter it's public, otherwise it's private.</p>
+<p><em>What?</em></p>
+<p>This is so unintuitive. There's nothing simple in this. It's just another constraint. I'm sure users will understand a simple <code>pub</code> and <code>priv</code>. This "feature" is just a source of confusion in my opinion.</p>
+<h2>4. Strictness of the Compiler</h2>
+<p>Some of the errors that the compiler generates (which you <em>can't</em> turn off) are just plain annoying. An example is unused imports. Picture this: I just wrote a new type in a new package and I want to see if it compiles. So I go into another package and do</p>
+<pre><code class="language-go">import &quot;newpackage&quot;
+[...]
+func something() {
+    x := newpackage.SomeType {
+        // Initialize this
+    }
+}
+</code></pre>
+<p>I try running it and</p>
+<pre><code class="language-text">./prog.go:132:2: x declared but not used
+</code></pre>
+<p>Just don't. Isn't a warning enough? There <em>isn't even a way to turn it off</em>. The same goes for imports (although I can't really argue about that since <code>gofmt</code> takes care of it). Sure, unused variables are a source of bugs, but I'm sure a warning is enough. If I choose to ignore it it's my problem, not the compiler's.</p>
+<h2>What it <em>did</em> get right</h2>
+<p>Besides having all the problems I discussed above, I think Go got a lot of things right. Here's a small subset of them:</p>
+<ul>
+<li><strong>Standard Library</strong> - It's very complete, it provides different parsers, a web server, a templating engine, containers and much more</li>
+<li><strong>Reflection</strong> - It's just awesome. You can use it for things ranging from printing structures to parsing! (for real check out the XML, JSON, etc parsers from the standard library).</li>
+<li><strong>Tooling</strong> - In my experience, the Go tools have been really nice to use. The formatter (<code>gofmt</code>), the language server (<code>gopls</code>) are one of the best ones I've seen.</li>
+<li><strong>Speed</strong> - By this I mean the compilation speed, Go is one of the fastest compilers I've used. It's really amazing to have a edit-run cycle that's <em>this</em> fast.</li>
+<li><strong>Multiple Return Types &amp; Error Handling</strong> - This is really nice. Along with the result, your function can return an error that could've happened</li>
+</ul>
+<h2>Conclusion</h2>
+<p>I think Go doesn't really <em>know</em> what it wants to be. On one hand it's supposed to be safe, but we've got <code>interface{}</code> everywhere. On the other hand, it's supposed to be simple, but it's got unintuitive stuff like capitalization. It's supposed to be easy to write but it doesn't compile at all if a variable is unused.</p>
+<p>At the same time, it has really cool things that are just a joy to use, and not a lot of other languages have them. The syntax is one of the things that it <em>did</em> manage to make simple for example, it's really enjoyable and there's not much boilerplate generally.</p>
+<p>I definitely recommend learning Go, even if you don't think you're gonna use it. It doesn't take you more than a few hours to learn 99% of the features, and it will probably prove itself useful one day :)</p>
+    <hr class="marginup" />
+    <p class="gray">Made with ❤ and <a href="https://github.com/unsafecast/walnutgen">WalnutGen</a></p>
+    </body>
+</html>

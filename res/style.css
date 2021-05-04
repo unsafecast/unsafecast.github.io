@@ -23,7 +23,7 @@ pre {
     }
 }
 
-h1, h2, h3, h4, h5, h6, p, a {
+h1, h2, h3, h4, h5, h6, p, a, li {
     font-family: 'PT Serif', sans-serif;
     color: #262626;
 }
